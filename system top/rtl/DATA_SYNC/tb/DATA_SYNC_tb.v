@@ -1,0 +1,91 @@
+module DATA_SYNC_tb ();
+
+	////////////////////////////////// parameters declaration ///////////////////////////////////
+	/////////////////////////////////////////////////////////////////////////////////////////////
+	parameter NUM_STAGES = 2;
+	parameter BUS_WIDTH = 8;
+	parameter CLK_PERIOD = 100;
+
+	///////////////////////////////////// signals declaration ///////////////////////////////////
+	/////////////////////////////////////////////////////////////////////////////////////////////
+
+	reg 			     bus_enable_tb;
+	reg 				 CLK_tb;
+	reg 				 RST_tb;
+	reg  [BUS_WIDTH-1:0] unsync_bus_tb;
+	wire [BUS_WIDTH-1:0] sync_bus_tb;
+	wire 				 enable_pulse_tb;
+
+	//////////////////////////////////// clk generation block ///////////////////////////////////
+	/////////////////////////////////////////////////////////////////////////////////////////////
+	initial begin
+		CLK_tb = 1'b0;
+		forever #(CLK_PERIOD/2) CLK_tb = ~CLK_tb;
+	end
+
+	////////////////////////////////////// DUT Instantiation ////////////////////////////////////
+	/////////////////////////////////////////////////////////////////////////////////////////////
+	DATA_SYNC DUT (
+		.bus_enable(bus_enable_tb), .CLK(CLK_tb), .RST(RST_tb),
+		.unsync_bus(unsync_bus_tb), .sync_bus(sync_bus_tb), .enable_pulse(enable_pulse_tb)
+	);
+
+	//////////////////////////////////////// test stimilus //////////////////////////////////////
+	/////////////////////////////////////////////////////////////////////////////////////////////
+	
+	initial begin
+		INITIALIZE_TASK();
+		RST_TASK();
+		TRANSMIT_DATA_TASK(1'b1, 8'h55);
+		CHECK_OUTPUT_TASK();
+		#(CLK_PERIOD/2)
+		TRANSMIT_DATA_TASK(1'b1, 8'haa);
+		CHECK_OUTPUT_TASK();
+		#500
+		$stop;
+
+	end
+
+
+	///////////////////////////////////// Tasks definations /////////////////////////////////////
+	/////////////////////////////////////////////////////////////////////////////////////////////
+	task RST_TASK;
+		begin
+			RST_tb = 1'b0;
+			#(2*CLK_PERIOD)
+			RST_tb = 1'b1;
+		end
+	endtask
+
+	task INITIALIZE_TASK;
+		begin
+			bus_enable_tb = 1'b0;
+			unsync_bus_tb = 'b0;
+		end
+	endtask
+
+	task TRANSMIT_DATA_TASK;
+		input 				  EN;
+		input [BUS_WIDTH-1:0] DATA;
+		begin
+			bus_enable_tb = EN;
+			unsync_bus_tb = DATA;
+			#(CLK_PERIOD)
+			bus_enable_tb = 1'b0;
+		end
+	endtask
+
+	task CHECK_OUTPUT_TASK;
+		begin
+			@(posedge enable_pulse_tb)
+			if (sync_bus_tb != unsync_bus_tb) begin
+				$display("error, check waveform");
+			end
+		end
+	endtask
+
+
+
+
+
+endmodule
